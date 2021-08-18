@@ -1,0 +1,176 @@
+---
+title: "My Data Viz Work"
+author: "Halina Do-Linh"
+date: "8/18/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# General use 
+library(tidyverse)
+library(here)
+library(janitor)
+
+# Specific for data viz
+library(patchwork)
+library(ggrepel)
+library(gghighlight)
+library(paletteer)
+library(ggExtra)
+library(ggbeeswarm)
+
+# Data for interactive session today
+library(gapminder)
+
+# Use for working with spatial data in R
+library(sf)
+```
+
+## Read in lizard data
+```{r}
+lizards <- read_csv(here::here("data_tidy", "lizards.csv"))
+
+# check the starting point where you are use here() in the console
+```
+
+### Making a terrible histogram of lizard weights
+```{r}
+ggplot(data = lizards, aes(x = weight)) +
+  geom_histogram(fill = "orange", 
+                 color = "navy blue",
+                 size = 1.2,
+                 linetype = "dashed")
+
+# top line of ggplot is the base line of expectations, but you could put (data = lizards, aes(x = weight)) into geom_histogram. This allows you to pull multiple data sets to plot (not a common occurrence, but an option).
+# color refers to points and lines
+# fill refers to the actual fill color for shapes or polygons
+# size for polygons refers to the width of the border
+# linetype changes the line type
+# these are outside of aes() because they are NOT dependent on a variable
+```
+
+## Line Plot: total_length on x-axis and weight on y-axis
+```{r}
+ggplot(data = lizards, aes(x = total_length, y = weight, color = weight)) +
+  geom_point(alpha = 0.5, shape = 4)
+
+# shape has a range of 0-25 where each number is a different shape 
+# alpha has to do with opacity  
+```
+
+## Bubble Plot
+Where the color of the points change based on common_name and size of point varies based on total_length.
+
+DISCLAIMER: Bad idea!
+```{r}
+ggplot(data = lizards, aes(x = total_length, y = weight)) +
+  geom_point(aes(color = common_name, size = total_length),
+             shape = 22,
+             fill = "gray",
+             size = 1) +
+  theme_void()
+
+# again add color and other styles in aes if the style is based on a variable.
+```
+
+## Faceting
+
+Facet wrap creates a grid with two variables (typically categorical). 
+```{r}
+ggplot(data = lizards, aes(x = total_length, y = weight)) +
+  geom_point(aes(color = common_name),
+             size = .5) +
+  theme_light() +
+  facet_wrap(~common_name, ncol = 10)
+
+# ~ = "by" so facet_wrap by common_name
+# see differences btwn facet wraps using ncol()
+```
+
+Create a facet_grid instead
+```{r}
+ggplot(data = lizards, aes(x = total_length, y = weight)) + 
+  geom_point(aes(color = common_name)) +
+  theme_light() +
+  facet_grid(sex~tail)
+
+# facet_grid creates a grid for you based on variables you tell it
+ 
+```
+
+## More examples
+
+Plot lizard counts by common_name. Find total lizard counts by common_name.
+```{r}
+lizard_counts <- lizards %>% 
+  group_by(common_name) %>% 
+  summarize(count = n())
+
+lizard_counts
+
+# shortcut to do the same thing: 
+# lizard_counts <- lizards %>% dyplr::count(common_name)
+# lizard_counts <- lizards %>% count(common_name, tail)
+# use the first way when you're trying to find multiple summaries like mean, sd, and count.
+# tally() uses summarize and n() but NOT group_by()
+```
+
+```{r}
+ggplot(data = lizard_counts, aes(y = fct_reorder(common_name, count), x = count)) +
+  geom_col(aes(fill = common_name)) +
+  labs(x = "Lizard Counts", y = "Lizard Common Name")
+
+# wrote the code this way because having common_name on the y axis makes the name more readable. Switch it and see how it overlaps and becomes unreadable on the x-axis.
+# you can also use coord_flip() to switch the x and y variables
+# fct_reorder() is built to create a factor and have it reorder based on another variable. Need to tell it the variable. 
+# forcats is part of the tidyverse
+```
+
+Try converting common name to an ordered factor outside of ggplot
+```{r}
+lizard_cm_chr <- lizard_counts %>% 
+  mutate(common_name = as.factor(common_name))
+
+# can also be written as
+# mutate(common_name = fct_reorder(common_name, count))
+# then use levels(lizard_cm_chr$common_name)
+# you want it be fct_reorder so that it's in the order you want and then check the order using levels
+
+class(lizard_cm_chr$common_name)
+```
+
+## Axis scale breaks, limits & labels
+
+Create a scatter plot of total_length (x) by weight(y)
+```{r}
+ggplot(data = lizards, aes(x = total_length, y = weight)) +
+  geom_point() +
+  scale_x_continuous(breaks = c(0, 50, 500),
+                     limits = c(0, 500),
+                     expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0))
+
+# breaks refers to tick mark breaks
+```
+
+```{r}
+lizard_counts <- lizards %>% 
+  mutate(date = lubridate::mdy(date)) %>% 
+  count(date)
+
+# count(date) and also be written using group_by() and summarize(count = n())
+# class(lizard_counts$date)
+```
+
+Now let's make the plot
+```{r}
+ggplot(data = lizard_counts, aes(x = date, y = n))+
+  geom_line() +
+  scale_x_date(date_breaks = "3 years",
+               date_labels = "%y")
+
+# needed to change the date column values from characters to date so that the graph would recognize the date value instead recognizing it as a character
+# know what axis you're working on!
+```
+
