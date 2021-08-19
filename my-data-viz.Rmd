@@ -174,3 +174,202 @@ ggplot(data = lizard_counts, aes(x = date, y = n))+
 # know what axis you're working on!
 ```
 
+```{r}
+ggplot(data = lizards, aes(x = total_length, y = weight)) +
+  geom_point(aes(color = weight)) +
+  scale_color_stepsn(colors = c("green", "red", "purple", "blue"),
+                     breaks = c(0, 20, 40, 50, 80))
+  
+#  scale_color_gradientn(colors = c("orange", "red", "purple", "black"))
+
+# check out other scale_color_gradient functions
+```
+
+### Update a color scheme using a palette in paletteer
+
+Make a horizontal boxplot with common_name on the y-axis, total_length on the x-axis, with color changing based on common_name
+```{r}
+lizards_fct <- lizards %>% 
+  mutate(common_name = fct_reorder(common_name, total_length, .fun = median))
+
+# take common_name, turn it into a factor, and then reorder factor values by median of total_length
+
+ggplot(data = lizards_fct, aes(y = common_name, x = total_length)) +
+  geom_boxplot(aes(fill = common_name), show.legend = FALSE) +
+  labs(y = "Lizard Common Name", x = "Length") +
+  scale_fill_paletteer_d(palette = "futurevisions::earth")
+  
+```
+
+### Yet Another Graph
+```{r}
+ggplot(data = lizards, aes(x = total_length, y = weight)) +
+  geom_point() +
+  theme(
+    panel.grid = element_blank(),
+    plot.background = element_rect("cyan"),
+    axis.text.x = element_text(color = "orange"),
+    axis.title = element_text(color = "yellow", size = 12)
+  )
+
+# the most specific level trumps all other commands in theme. So panel.grid.major.x trumps panel.grid.major. Order does not matter.
+```
+
+
+## Day 9 `ggplot` continued
+
+Read in lizards data again and ran attached packages (library).
+
+## ggrepel
+
+Package for adding labels on a plot.
+
+Make a subset from lizards, called ww_lizards, that only contains observations for "western whiptail" lizards from the site "sand".
+```{r}
+ww_lizards <- lizards %>% 
+  filter(common_name == "western whiptail" & site == "sand") 
+
+```
+
+Making a scatter plot of weight by total_length
+
+```{r}
+ggplot(data = ww_lizards, aes(x = total_length, y = weight)) +
+  geom_point() +
+  geom_text_repel(aes(label = toe_num), size = 3, max.overlaps = 20)
+
+# want to add a label for toe_num
+```
+## Gapminder Data
+
+Create a scatter plot of gdpPercap (x) and lifeExp (y), labeled by country name. Filter for only Europe.
+
+```{r}
+gapminder_euro <- gapminder %>% 
+  filter(continent == "Europe", year == 2002) 
+
+ggplot(data = gapminder_euro, aes(x =lifeExp, y = gdpPercap)) +
+  geom_point() +
+  geom_text_repel(aes(label = country), size = 3)
+
+```
+
+## gghighlight
+
+```{r}
+p <- ggplot(lizards, aes(total_length, weight)) +
+  geom_point()
+
+p + gghighlight(toe_num == 250, label_key = toe_num)
+```
+
+Create a line plot of total_length by weight
+
+```{r}
+q <- ggplot(lizards, aes(total_length, weight)) +
+  geom_line(aes(color = common_name)) +
+  gghighlight(max(weight) > 30)
+
+q
+```
+
+## Patchwork for compound figures
+
+patchwork is about using multiple files in one graph
+
+```{r}
+ q / (p | q) &
+  theme_bw() &
+  theme(
+    panel.grid.minor = element_blank()
+  )
+
+# apply pemdas 
+# use the & to add styles to all plots
+```
+
+## A Few New Graph Types
+
+### Maringal plots
+
+```{r}
+whiptails <- lizards %>% 
+  filter(common_name == "western whiptail") %>% 
+  drop_na(weight, total_length)
+
+ggplot(data = whiptails, aes(total_length, weight)) +
+  geom_point() +
+  geom_rug()
+```
+
+Marginal Plot with box plots
+```{r}
+my_plot <- ggplot(data = whiptails, aes(total_length, weight)) +
+  geom_point(aes(color = sex), size = 2) +
+  scale_color_manual(values = c("cyan4", "black", "goldenrod"),
+                     name = "Sex:",
+                     labels = c("female", "juvenile", "male")) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom")
+
+ggMarginal(my_plot, type = "densigram", groupColour = TRUE)
+
+# ggMarginal only uses the types: density, histogram, boxplot, violin, and densigram
+```
+## Beeswarm Plot
+
+```{r}
+ggplot(data = whiptails, aes(sex, weight)) +
+  geom_beeswarm() +
+  geom_boxplot(fill = NA)
+```
+
+### Heatmap with geom_tile
+
+Make a new df called lizard_counts starting from lizards with date converted to class date then count by year and common name the number of lizards observed.
+```{r}
+lizard_counts <- lizards %>% 
+  mutate(date = lubridate::mdy(date)) %>% 
+  mutate(date = lubridate::year(date)) %>% 
+  count(common_name, date)
+#  group_by(year, common_name)
+#  summarize(count = c(year, common_name)) this is wrong need to fix it
+
+# for pulling out year, make a new column because you don't want to completely alter or lose your raw data
+```
+
+Make the heatmap
+
+```{r}
+ggplot(data = lizard_counts, aes(x = date, y = common_name)) +
+  geom_tile(aes(fill = n)) +
+  geom_text(aes(label = n), color = "white", size = 3) +
+  scale_fill_viridis_c()
+#  scale_fill_gradientn(colors = c("navy", "red", "orange"))
+
+#scale_fill_viridis is color blind friendly
+# this could be a good plot to investigate trends in your data when you are first exploring your data
+# color changes line and points
+# fill changes the whole fill color
+```
+
+### Make a map!
+
+```{r}
+jornada_vegetation <- read_sf(here("data_raw", "spatial_vegetation", "doc.kml")) %>% 
+  select(Name) %>% 
+  clean_names()
+
+ggplot(data = jornada_vegetation) +
+  geom_sf(aes(fill = name), color = NA, size = 0.2) +
+  scale_fill_paletteer_d(palette = "ggthemes::manyeys") +
+  labs(x = "Longitude",
+       y = "Latitude",
+       fill = "Dominant vegetation:")
+
+# thin while border around polygons works really well or NA bc that's typically how we see maps
+# palettes are built specifically for continuous and discrete variables 
+
+```
+
